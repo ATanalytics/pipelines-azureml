@@ -11,7 +11,7 @@ env:
   ml-exp: exp-test 
   ml-model-name: diabetes-model # Model name
   ml-aks-name: aks-prod # AKS cluster name
-  ml-model-path: outputs/ridge_0.95.pkl 
+  ml-model-path: outputs/ridge_0.90.pkl 
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,20 +25,17 @@ jobs:
     - name: install azmlcli
       run: az extension add -n azure-cli-ml
     - name: attach to workspace
-      working-directory: models/diabetes
+      working-directory: ${{env.ml-path}}
       run: az ml folder attach -w myworkspace -g myresourcegroup
     - name: create remote compute
-      working-directory: models/diabetes
-      run: az ml computetarget create amlcompute -n cpu --vm-size STANDARD_D2_V2 --max-nodes 4
+      working-directory: ${{env.ml-path}}
+      run: az ml computetarget create amlcompute -n ${{env.ml-ct}} --vm-size STANDARD_D2_V2 --max-nodes 4
     - name: train model
-      working-directory: models/diabetes
+      working-directory: ${{env.ml-path}}
       run: az ml run submit-script -c config/train --ct ${{env.ml-ct}} -e ${{env.ml-exp}} -t run.json
     - name: register model
-      working-directory: models/diabetes
+      working-directory: ${{env.ml-path}}
       run: az ml model register -n ${{env.ml-model-name}} -f run.json --asset-path ${{env.ml-model-path}} -t model.json
-    - name: install azmlcli
-      working-directory: models/diabetes
-      run: az ml model deploy -n acicicd -f model.json --ic inferenceConfig.yml --dc deploymentConfig.yml --overwrite
-    - name: delete created service
-      working-directory: models/diabetes
-      run: az ml service delete -n acicicd
+    - name: deploy model to ACI
+      working-directory: ${{env.ml-path}}
+      run: az ml model deploy -n acicicd3 -f model.json --ic config/inference-config.yml --dc config/deployment-config-aci.yml --overwrite
